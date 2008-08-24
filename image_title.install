@@ -1,0 +1,30 @@
+<?php
+// $Id:
+
+/**
+ * Implementation of hook_install().
+ */
+function image_title_install() {	
+  switch ($GLOBALS['db_type']) { 
+    case 'mysql':
+    case 'mysqli':
+      db_query("CREATE TABLE {image_title} ( 
+        nid int unsigned NOT NULL default '0', 
+        image varchar(225) default NULL, 
+        status int(1) NOT NULL,
+        KEY imgtype (nid, image)
+      ) /*!40100 DEFAULT CHARACTER SET UTF8 */ ");
+
+      break;
+    case 'pgsql':
+     // need support 
+      break;
+  }
+}
+
+/**
+ * Implementation of hook_uninstall().
+ */
+function image_title_uninstall() { 
+  db_query('DROP TABLE {image_title}'); 
+}

@@ -1,0 +1,146 @@
+<?php
+// $Id$
+
+/**
+ * form alter hook to add image field for title 
+ */
+function image_title_form_alter( $form_id, &$form ) {  
+   
+  // We're only modifying node forms, if the type field isn't set we don't need
+  // to bother; otherwise, store it for later retrieval.
+  if (isset($form['type'])) {
+    $type = $form['type']['#value'];
+  }
+  elseif (isset($form['orig_type'])) {
+    $type = $form['orig_type']['#value'];
+  }
+  else {
+    return;
+  }
+  // check node type and match settings
+  if($form_id == $type .'_node_form' ){
+        $form['image_title'] = array('#type' => 'fieldset', '#title' => t('Title Image'), '#weight' => 1);
+        $form['image_title']['image_title_upload'] = array(
+	  '#type' => 'file',
+	  '#title' => t('Attach title image'),
+	  '#size' => 40,
+	);
+
+	$node =  $form['#node'];
+
+	$picture = theme("image_title", $node);
+	$form['image_title']['current_timage'] = array('#value' => $picture);
+	$form['image_title']['current_timage_v'] = array('#type' => 'checkbox', '#default_value'=>$node->image_title_status,  '#title' => t('Show this image in place of title'), '#description' => t('Check this box to override title with image uploaded.')); // used as status
+
+	$form['#attributes']['enctype'] = 'multipart/form-data';
+  }
+  
+}
+/**
+ * theming image field for title for node form ..
+ */
+function theme_image_title($node) {
+
+    if ($node->image_title && file_exists($node->image_title)) {
+      $picture = $node->image_title; // file_create_url($node->image_title);
+    }
+
+    if (isset($picture)) {
+      $alt = t( $node->title );
+      $picture = theme('image', $picture, $alt, $alt, '', FALSE); 
+
+      return "<div class=\"img_title\">$picture</div>";
+    }
+
+}
+
+/**
+ * nodeapi to save image for title 
+ */
+function image_title_nodeapi(&$node, $op, $teaser, $page) {
+  global $form_values;
+
+  switch ($op) {
+
+    case 'validate':
+
+      $form_values['image_title'] = $node->image_title;
+      if ($file = file_check_upload('image_title_upload')) { 
+     	  if (!form_get_errors()) {
+	        $path = file_directory_path();  
+	        if ($file1 = file_save_upload('image_title_upload', $path.'/img-title-'. $node->nid .''. $file->filename, 1)) {
+	          $form_values['image_title'] = $file1->filepath; 
+	        }
+	        else { 
+	          form_set_error('image_title', t("Failed to upload the image title; the %directory directory doesn't exist or is not writable.", array('%directory' => $path.'/img-title-'. $node->nid)));
+	        }
+	      }
+      }
+
+      break;
+
+    case 'load':
+
+      $image_title = db_fetch_array(db_query('SELECT image, status  FROM {image_title} WHERE nid = %d', $node->nid));
+
+      return array('image_title' => $image_title['image'], 'image_title_status' => $image_title['status'] ); 
+
+      break;
+
+    case 'insert':
+      db_query('INSERT INTO {image_title} (nid, image) VALUES (%d, "%s")', $node->nid, $form_values['image_title']);
+
+      break;
+
+    case 'update':  
+
+      if($form_values['current_timage_v']) {  
+        $status = $form_values['current_timage_v'];  
+      }else {  
+        $status = 0;  // fine 
+      }
+      // insert update/database here ...
+      if( $form_values['image_title'] != '' ) {
+        db_query('DELETE FROM {image_title} WHERE nid = %d', $node->nid);  
+        db_query('INSERT INTO {image_title} (nid, image, status) VALUES (%d, "%s", %d)', $node->nid, $form_values['image_title'], $status);
+      }else {
+        db_query('update {image_title} set status = %d WHERE nid = %d', $status, $node->nid);
+      }
+      
+      break;
+
+    case 'delete':
+      db_query('DELETE FROM {image_title} WHERE nid = %d', $node->nid);
+      break; 
+
+   case 'view': // not confident here --  avail for detail page only ...
+     if( $node->image_title_status == 1 ) {
+
+       if(arg(0) == 'node' && arg(1) != '' && is_numeric(arg(1)) ) {
+         // add this image to title.. ?? on teaser too ? yes
+         drupal_set_title(theme('image', $node->image_title, $node->title, $node->title, '', FALSE));
+       }else {
+         // you may use this var in .tpl for customizing
+         // $node->title = theme('image', $node->image_title, $node->title, $node->title, '', FALSE);
+         // above can't be done as there is some text restriction...
+             $node->title = ''; // is it good ?? 
+             $node->content['image_title'] = array(
+                                               '#value' => l(theme('image', $node->image_title, $node->title, $node->title, '', FALSE), 'node/'.$node->nid,array(),'','',false,true),
+                                               '#weight' => -1,
+                                              );
+       }
+     }
+     break;
+  }
+}
+
+// view is still need to be updated .. add to ur template 
+/* add this to ur theme page.tpl.php where title is printed  
+										<?php 
+										if($node->image_title_status && $node->image_title != '' ) {
+										    echo theme('image', $node->image_title); 
+										  }else {
+										?>
+										<h1 align="left" class="title"><?php print $title ?></h1>
+										<?php } ?>
+										*/
