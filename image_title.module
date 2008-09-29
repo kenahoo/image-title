@@ -2,13 +2,29 @@
 // $Id$
 
 /**
+ * Implementation of hook_perm().
+ */
+function image_title_perm() {
+  return array('add image title');
+}
+
+/**
  * form alter hook to add image field for title 
  */
-function image_title_form_alter( $form_id, &$form ) {  
+function image_title_form_alter( $form_id, &$form ) {   
    
   // We're only modifying node forms, if the type field isn't set we don't need
   // to bother; otherwise, store it for later retrieval.
-  if (isset($form['type'])) {
+  if ($form_id == 'node_type_form' && isset($form['identity']['type'])) {
+    $form['workflow']['image_title'] = array(
+      '#type' => 'radios',
+      '#title' => t('Default image title'),
+      '#default_value' => variable_get('image_title_'. $form['#node_type']->type, 0),
+      '#options' => array(t('Disabled'), t('Enabled')),
+      '#description' => t('Enable this to have image title for this content type.'),
+    );
+  }
+  elseif (isset($form['type'])) {
     $type = $form['type']['#value'];
   }
   elseif (isset($form['orig_type'])) {
@@ -17,22 +33,34 @@ function image_title_form_alter( $form_id, &$form ) {
   else {
     return;
   }
+
   // check node type and match settings
-  if($form_id == $type .'_node_form' ){
-        $form['image_title'] = array('#type' => 'fieldset', '#title' => t('Title Image'), '#weight' => 1);
-        $form['image_title']['image_title_upload'] = array(
-	  '#type' => 'file',
-	  '#title' => t('Attach title image'),
-	  '#size' => 40,
-	);
+  if($form_id == $type .'_node_form' && user_access('add image title') && (variable_get('image_title_'. $type, 0) == 1) ){ 
+    
+    $form['image_title'] = array( '#type' => 'fieldset', 
+                                  '#title' => t('Title Image'), 
+                                  '#weight' => 1, 
+                                  '#collapsible' => TRUE, 
+                                  '#collapsed' => TRUE,
+                                  );
+    $form['image_title']['image_title_upload'] = array(
+                                                       '#type' => 'file',	
+                                                       '#title' => t('Attach title image'),
+                                                       '#size' => 40,
+                                                       );
 
-	$node =  $form['#node'];
+	  $node =  $form['#node'];         
 
-	$picture = theme("image_title", $node);
-	$form['image_title']['current_timage'] = array('#value' => $picture);
-	$form['image_title']['current_timage_v'] = array('#type' => 'checkbox', '#default_value'=>$node->image_title_status,  '#title' => t('Show this image in place of title'), '#description' => t('Check this box to override title with image uploaded.')); // used as status
+	  $picture = theme("image_title", $node);
+	  $form['image_title']['current_timage'] = array('#value' => $picture);
+	  $form['image_title']['current_timage_v'] = array('#type' => 'checkbox', 
+                                                     '#default_value' => $node->image_title_status,  
+                                                     '#title' => t('Show this image in place of title'), 
+                                                     '#description' => t('Check this box to override title with image uploaded.'),
+                                                     ); // used as status
 
-	$form['#attributes']['enctype'] = 'multipart/form-data';
+	  $form['#attributes']['enctype'] = 'multipart/form-data';  
+
   }
   
 }
@@ -60,6 +88,9 @@ function theme_image_title($node) {
 function image_title_nodeapi(&$node, $op, $teaser, $page) {
   global $form_values;
 
+  if( !user_access('add image title') || (variable_get('image_title_'. $node->type, 0) == 0) ) {    
+    return; // do nothing ... 
+  }
   switch ($op) {
 
     case 'validate':
