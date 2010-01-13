@@ -1,5 +1,5 @@
-; $Id$
 name = Image Title
-description = Allows to upload nice image to replace text version of node title
+description = Allows you to upload images to replace text versions of page titles
 package = Other
 version = VERSION
+core = 6.x
