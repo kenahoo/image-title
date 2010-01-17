@@ -76,3 +76,9 @@ function image_title_update_6000() {
   db_create_table($ret, 'image_title_menu', $schema['image_title_menu']);
   return $ret;
 }
+
+function image_title_update_6001() {
+  $ret = array();
+  db_add_field($ret, 'image_title_node', 'status', array('type' => 'int', 'not null' => TRUE));
+  return $ret;
+}

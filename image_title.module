@@ -121,8 +121,31 @@ function image_title_menu_router_form_submit($form, &$form_state) {
  * Implementation of hook_form_alter() to add title image field to node forms 
  */
 function image_title_form_alter(&$form, $form_state, $form_id) {  
+  // alter workflow to have image title settings
+  if ($form_id == 'node_type_form' && isset($form['identity']['type'])) {
+    $form['workflow']['image_title'] = array(
+      '#type' => 'radios',
+      '#title' => t('Default image title'),
+      '#default_value' => variable_get('image_title_'. $form['#node_type']->type, 0),
+      '#options' => array(t('Disabled'), t('Enabled')),
+      '#description' => t('Enable this to have image title for this content type.'),
+    );
+  }
+
+  // We're only modifying node forms, if the type field isn't set we don't need
+  // to bother; otherwise, store it for later retrieval.
+  if (isset($form['type'])) {
+    $type = $form['type']['#value'];
+  }
+  elseif (isset($form['orig_type'])) {
+    $type = $form['orig_type']['#value'];
+  }
+  else {
+    return;
+  }
+  
   //check user is permitted to create image titles
-  if (user_access('create image titles')) {
+  if (user_access('create image titles') && (variable_get('image_title_'. $type, 0) == 1)) {
     
     //load an existing picture
     $node =  $form['#node'];
@@ -132,18 +155,7 @@ function image_title_form_alter(&$form, $form_state, $form_id) {
     if ($picture) {
       $collapsed = FALSE;
     }
-    
-    // We're only modifying node forms, if the type field isn't set we don't need
-    // to bother; otherwise, store it for later retrieval.
-    if (isset($form['type'])) {
-      $type = $form['type']['#value'];
-    }
-    elseif (isset($form['orig_type'])) {
-      $type = $form['orig_type']['#value'];
-    }
-    else {
-      return;
-    }
+        
     // check node type and match settings
     if($form_id == $type .'_node_form' ){
       $form['image_title'] = array(
@@ -154,21 +166,28 @@ function image_title_form_alter(&$form, $form_state, $form_id) {
         '#collapsed' => $collapsed,  
       );
       $form['image_title']['image_title_upload'] = array(
-	    '#type' => 'file',
-	    '#title' => t('Attach title image'),
-	    '#size' => 40,
-	  );
-	  if ($picture) {
-	  	//show the image
-	  	$form['image_title']['current_title_image'] = array('#value' => $picture);
-	    // set the delete flag
-	    $form['image_title']['image_title_delete'] = array(
-          '#type' => 'checkbox',
-          '#default_value'=> 0,
-          '#title' => t('Delete title image.'),
-        ); 
-	  }
-	  $form['#attributes']['enctype'] = 'multipart/form-data';
+        '#type' => 'file',
+        '#title' => t('Attach title image'),
+        '#size' => 40,
+      );
+      if ($picture) {
+        //show the image
+        $form['image_title']['current_title_image'] = array('#value' => $picture);
+        // set the delete flag
+        $form['image_title']['image_title_delete'] = array(
+            '#type' => 'checkbox',
+            '#default_value'=> 0,
+            '#title' => t('Delete title image.'),
+          ); 
+      }
+      // status for ability to hide for specific content 
+      $form['image_title']['current_title_image_status'] = array('#type' => 'checkbox', 
+                                                     '#default_value' => $node->image_title_status,  
+                                                     '#title' => t('Show this image in place of title'), 
+                                                     '#description' => t('Check this box to override title with image uploaded.'),
+                                                     ); 
+
+   	  $form['#attributes']['enctype'] = 'multipart/form-data';
     }
   }
 }
@@ -203,14 +222,17 @@ function image_title_theme(){
  * (save, update, delete, etc.) 
  */
 function image_title_nodeapi(&$node, $op, $teaser, $page) {
+  if( !user_access('create image titles') || (variable_get('image_title_'. $node->type, 0) == 0) ) {    
+    return; // do nothing ... 
+  }
   switch ($op) {
     case 'validate':
       if(!empty($_FILES['files']['name']['image_title_upload'])) {
-	    $path = file_directory_path();
-	    $fullpath = $path.'/'.variable_get('image_title_directory', 'img-title');  
-	    if (!file_check_directory($fullpath)) {
-	      form_set_error('image_title_upload', t('Failed to upload the image title; the %directory directory doesn\'t exist or is not writable.', array('%directory' => $fullpath)));
-	    }
+        $path = file_directory_path();
+        $fullpath = $path.'/'.variable_get('image_title_directory', 'img-title');  
+        if (!file_check_directory($fullpath)) {
+          form_set_error('image_title_upload', t('Failed to upload the image title; the %directory directory doesn\'t exist or is not writable.', array('%directory' => $fullpath)));
+        }
       }
       break;
 
@@ -233,6 +255,12 @@ function image_title_nodeapi(&$node, $op, $teaser, $page) {
         db_query('DELETE FROM {image_title_node} WHERE nid = %d', $node->nid);
       }
       
+      if( $node->current_title_image_status ) {  
+        $status = $node->current_title_image_status;  
+      }else {  
+        $status = 0; 
+      }
+      
       //now handle the upload
       if(!empty($_FILES['files']['name']['image_title_upload'])) {    
         //set upload parameters  
@@ -241,25 +269,27 @@ function image_title_nodeapi(&$node, $op, $teaser, $page) {
           'file_validate_is_image' => array(),
         );
         $overwrite = 0;
-	    if ($file = file_save_upload('image_title_upload', $validators, $fullpath, $overwrite)) {
-	      file_set_status($file, FILE_STATUS_PERMANENT);
-	      //we don't want the old image - delete it
-          if (!($file->filepath === $image_title['image'])) {
-            file_delete($image_title['image']);
-          }
-	      db_query('DELETE FROM {image_title_node} WHERE nid = %d', $node->nid);  
-          db_query('INSERT INTO {image_title_node} (nid, image) VALUES (%d, "%s")', $node->nid, $file->filepath);
-	    } else {
+        if ($file = file_save_upload('image_title_upload', $validators, $fullpath, $overwrite)) {
+          file_set_status($file, FILE_STATUS_PERMANENT);
+          //we don't want the old image - delete it
+            if (!($file->filepath === $image_title['image'])) {
+              file_delete($image_title['image']);
+            }
+            db_query('DELETE FROM {image_title_node} WHERE nid = %d', $node->nid);  
+            db_query('INSERT INTO {image_title_node} (nid, image, status) VALUES (%d, "%s", %d)', $node->nid, $file->filepath, $status);
+        } else {
           drupal_set_message(t('Failed to upload the title image.'), 'error');
         }
+      }else {
+        db_query('update {image_title_node} set status = %d WHERE nid = %d', $status, $node->nid); 
       }
-    break;
-
+    break; 
+    
     case 'load':
-      $image_title = db_fetch_array(db_query('SELECT image  FROM {image_title_node} WHERE nid = %d', $node->nid));
-      return array('image_title' => $image_title['image']); 
+      $image_title = db_fetch_array(db_query('SELECT image, status FROM {image_title_node} WHERE nid = %d', $node->nid));
+      return array('image_title' => $image_title['image'], 'image_title_status' => $image_title['status'] ); 
     break;
-
+    
     case 'delete':
       //clean up any orphan title images
       $image_title = db_fetch_array(db_query('SELECT image  FROM {image_title_node} WHERE nid = %d', $node->nid));
@@ -281,9 +311,9 @@ function image_title_nodeapi(&$node, $op, $teaser, $page) {
 function image_title_preprocess_page(&$variables) { 
   if (arg(0) === 'node' && is_numeric(arg(1))) {
     $thisnode = node_load($variables['node']->nid);
-    if($thisnode->image_title){
+    if($thisnode->image_title && $thisnode->image_title_status ){
       $image = theme('image', $thisnode->image_title, $thisnode->title, $thisnode->title, '', FALSE);
-      $title = '<span>' . $thisnode->title . '</span>' . $image;
+      $title = '<span class="txt_title">' . $thisnode->title . '</span>' . $image;
       $variables['title'] = $title;
     }
   } else {
@@ -296,7 +326,7 @@ function image_title_preprocess_page(&$variables) {
     //check for an image for this page
     if ($image_title = db_fetch_array(db_query('SELECT image FROM {image_title_menu} WHERE path = "%s"', $item['path']))) {
       $image = theme('image', $image_title['image'], $item['title'], $item['title'], '', FALSE);
-      $title = '<span>' . $item['title'] . '</span>' . $image;
+      $title = '<span class="txt_title">' . $item['title'] . '</span>' . $image;
       $variables['title'] = $title;
       //we set another variable here because some modules may override $title
       //later on, so you can in turn override their values in your theme
