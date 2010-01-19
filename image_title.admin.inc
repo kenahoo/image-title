@@ -1,4 +1,5 @@
 <?php
+// $Id$
 /**
  * form containing available admin settings
  * 
@@ -26,7 +27,7 @@ function image_title_admin_form() {
  * validate function to check user-entered data from the admin form
  */
 function image_title_admin_form_validate($form_id, $form_state) {
-  $fullpath = file_directory_path().'/'.$form_state['values']['image_title_directory'];
+  $fullpath = file_directory_path() . '/' . $form_state['values']['image_title_directory'];
   file_check_directory($fullpath, 0, 'image_title_directory');
 }
 

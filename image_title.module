@@ -42,7 +42,7 @@ function image_title_menu_router_form() {
   $form['image_title_upload']['image_title_upload'] = array(
     '#type' => 'file',
     '#title' => t('Attach title image'),
-	'#size' => 40,
+  '#size' => 40,
   );
 
   if ($picture) {
@@ -51,7 +51,7 @@ function image_title_menu_router_form() {
     //set the delete flag
     $form['image_title_upload']['image_title_delete'] = array(
       '#type' => 'checkbox',
-      '#default_value'=> 0,
+      '#default_value' => 0,
       '#title' => t('Delete title image.'),
     ); 
   }
@@ -68,10 +68,10 @@ function image_title_menu_router_form() {
  * Validation for title image upload form on pages that are not nodes
  */
 function image_title_menu_router_form_validate($form, &$form_state) {
-  if(!empty($_FILES['files']['name']['image_title_upload'])) {
-	$fullpath = file_directory_path().'/'.variable_get('image_title_directory', 'img-title');
-	//file_check_directory() creates a form error automatically
-	file_check_directory($fullpath, 0, 'image_title_upload');
+  if (!empty($_FILES['files']['name']['image_title_upload'])) {
+  $fullpath = file_directory_path() . '/' . variable_get('image_title_directory', 'img-title');
+  //file_check_directory() creates a form error automatically
+  file_check_directory($fullpath, 0, 'image_title_upload');
   }
 }
 
@@ -94,24 +94,26 @@ function image_title_menu_router_form_submit($form, &$form_state) {
   }
   //print_r($_FILES);
   //now handle the upload
-  if(!empty($_FILES['files']['name']['image_title_upload'])) {    
+  if (!empty($_FILES['files']['name']['image_title_upload'])) {    
     //set upload parameters  
-    $fullpath = file_directory_path().'/'.variable_get('image_title_directory', 'img-title');
+    $fullpath = file_directory_path() . '/' . variable_get('image_title_directory', 'img-title');
     $validators = array(
       'file_validate_is_image' => array(),
     );
+
     $overwrite = 0;
     if ($file = file_save_upload('image_title_upload', $validators, $fullpath, $overwrite)) {
-	  file_set_status($file, FILE_STATUS_PERMANENT);
-	  //we don't want the old image - delete it
-	  //but make sure we don't delete the image we just uploaded
-	  if (!($file->filepath === $image_title['image'])) {
-	    file_delete($image_title['image']);
-	  }
-	  db_query('DELETE FROM {image_title_menu} WHERE path = "%s"', $form_state['values']['menu_router_item']['path']);  
+      file_set_status($file, FILE_STATUS_PERMANENT);
+      //we don't want the old image - delete it
+      //but make sure we don't delete the image we just uploaded
+      if (!($file->filepath === $image_title['image'])) {
+        file_delete($image_title['image']);
+      }
+      db_query('DELETE FROM {image_title_menu} WHERE path = "%s"', $form_state['values']['menu_router_item']['path']);  
       db_query('INSERT INTO {image_title_menu} (path, image) VALUES ("%s", "%s")', $form_state['values']['menu_router_item']['path'], $file->filepath);
       drupal_set_message(t('Title image saved.'));
-	} else {
+    } 
+    else {
       drupal_set_message(t('Failed to upload the title image.'), 'error');
     }
   }
@@ -157,7 +159,7 @@ function image_title_form_alter(&$form, $form_state, $form_id) {
     }
         
     // check node type and match settings
-    if($form_id == $type .'_node_form' ){
+    if ($form_id == $type . '_node_form' ) {
       $form['image_title'] = array(
         '#type' => 'fieldset',
         '#title' => t('Title image'),
@@ -176,7 +178,7 @@ function image_title_form_alter(&$form, $form_state, $form_id) {
         // set the delete flag
         $form['image_title']['image_title_delete'] = array(
             '#type' => 'checkbox',
-            '#default_value'=> 0,
+            '#default_value' => 0,
             '#title' => t('Delete title image.'),
           ); 
       }
@@ -187,7 +189,7 @@ function image_title_form_alter(&$form, $form_state, $form_id) {
                                                      '#description' => t('Check this box to override title with image uploaded.'),
                                                      ); 
 
-   	  $form['#attributes']['enctype'] = 'multipart/form-data';
+       $form['#attributes']['enctype'] = 'multipart/form-data';
     }
   }
 }
@@ -209,12 +211,12 @@ function theme_image_title($path) {
 /**
  * Implementation of hook_theme()
  */
-function image_title_theme(){
+function image_title_theme() {
   return array(
-  	'image_title' => array(
-  	  'arguments' => array('node' => NULL),
-  	),
-  );	
+    'image_title' => array(
+      'arguments' => array('node' => NULL),
+    ),
+  );  
 }
 
 /**
@@ -222,14 +224,14 @@ function image_title_theme(){
  * (save, update, delete, etc.) 
  */
 function image_title_nodeapi(&$node, $op, $teaser, $page) {
-  if( !user_access('create image titles') || (variable_get('image_title_'. $node->type, 0) == 0) ) {    
+  if ( !user_access('create image titles') || (variable_get('image_title_'. $node->type, 0) == 0) ) {    
     return; // do nothing ... 
   }
   switch ($op) {
     case 'validate':
-      if(!empty($_FILES['files']['name']['image_title_upload'])) {
+      if (!empty($_FILES['files']['name']['image_title_upload'])) {
         $path = file_directory_path();
-        $fullpath = $path.'/'.variable_get('image_title_directory', 'img-title');  
+        $fullpath = $path . '/' . variable_get('image_title_directory', 'img-title');  
         if (!file_check_directory($fullpath)) {
           form_set_error('image_title_upload', t('Failed to upload the image title; the %directory directory doesn\'t exist or is not writable.', array('%directory' => $fullpath)));
         }
@@ -243,7 +245,7 @@ function image_title_nodeapi(&$node, $op, $teaser, $page) {
       
       //set delete flag according to node form entry
       $delete = 0;
-      if($node->image_title_delete) {  
+      if ($node->image_title_delete) {  
         $delete = $node->image_title_delete;  
       }
       //if delete is requested, delete the unwanted image
@@ -255,16 +257,17 @@ function image_title_nodeapi(&$node, $op, $teaser, $page) {
         db_query('DELETE FROM {image_title_node} WHERE nid = %d', $node->nid);
       }
       
-      if( $node->current_title_image_status ) {  
+      if ( $node->current_title_image_status ) {  
         $status = $node->current_title_image_status;  
-      }else {  
+      }
+      else {  
         $status = 0; 
       }
       
       //now handle the upload
-      if(!empty($_FILES['files']['name']['image_title_upload'])) {    
+      if (!empty($_FILES['files']['name']['image_title_upload'])) {    
         //set upload parameters  
-        $fullpath = file_directory_path().'/'.variable_get('image_title_directory', 'img-title');
+        $fullpath = file_directory_path() . '/' . variable_get('image_title_directory', 'img-title');
         $validators = array(
           'file_validate_is_image' => array(),
         );
@@ -277,10 +280,12 @@ function image_title_nodeapi(&$node, $op, $teaser, $page) {
             }
             db_query('DELETE FROM {image_title_node} WHERE nid = %d', $node->nid);  
             db_query('INSERT INTO {image_title_node} (nid, image, status) VALUES (%d, "%s", %d)', $node->nid, $file->filepath, $status);
-        } else {
+        } 
+        else {
           drupal_set_message(t('Failed to upload the title image.'), 'error');
         }
-      }else {
+      }
+      else {
         db_query('update {image_title_node} set status = %d WHERE nid = %d', $status, $node->nid); 
       }
     break; 
@@ -311,12 +316,13 @@ function image_title_nodeapi(&$node, $op, $teaser, $page) {
 function image_title_preprocess_page(&$variables) { 
   if (arg(0) === 'node' && is_numeric(arg(1))) {
     $thisnode = node_load($variables['node']->nid);
-    if($thisnode->image_title && $thisnode->image_title_status ){
+    if ($thisnode->image_title && $thisnode->image_title_status ) { 
       $image = theme('image', $thisnode->image_title, $thisnode->title, $thisnode->title, '', FALSE);
       $title = '<span class="txt_title">' . $thisnode->title . '</span>' . $image;
       $variables['title'] = $title;
     }
-  } else {
+  } 
+  else {
     if (user_access('create image titles')) {
       //form for title image upload optionally available in a variable
       $variables['image_title_form'] = drupal_get_form('image_title_menu_router_form');
@@ -334,7 +340,7 @@ function image_title_preprocess_page(&$variables) {
       //  $variables['title'] = $variables['image_title'];
       $variables['image_title'] = $title;
     }
-  }	
+  }  
 }
 
 /**
