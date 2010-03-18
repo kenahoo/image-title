@@ -11,20 +11,13 @@ To delete the title image, mark the checkbox and save.
 
 
  Still in to do list...
-   Node type configuration for type based setting
+   Node type configuration for type based setting - Done by dksdev01
    More theming options.
    and what else you will need ...
  
  
 The $node->title text is included inside a <span> tag in the title variable, when a title image is available, which is being passed up also.
-This is merely for search engine optimisation reasons - so Google can still index your H1 text, as opposed to it only being an image tag.
-
-For this reason in your style.css you should include:
-
-h1.title span{
-  display:none;
-}
-
+This is merely for search engine optimisation reasons - so Google can still index your H1 text, as opposed to it only being an image tag. 
 to display only the image on screen but allow the node title to be indexed by search engines still.
 
 The title image upload form is also presented as a template variable, $image_title_form, available to all page.tpl.php files if you want to place it in a template.
