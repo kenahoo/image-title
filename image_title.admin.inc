@@ -26,10 +26,34 @@ function image_title_admin_form() {
 /**
  * validate function to check user-entered data from the admin form
  */
-function image_title_admin_form_validate($form_id, $form_state) {
-  $fullpath = file_directory_path() . '/' . $form_state['values']['image_title_directory'];
-  file_check_directory($fullpath, 0, 'image_title_directory');
-}
+function image_title_admin_form_validate($form_id, $form_state) { 
+  
+  $fullpath = file_directory_path() . '/' . $form_state['values']['image_title_directory'];  
+      
+    if (!file_exists($fullpath)) {  
+      if (@mkdir($fullpath, intval("00", 8))) {
+        $mod = fileperms($fullpath) & 0777;  
+        // update permission 
+        @chmod($fullpath, $mod);      
+      } 
+      if (!file_exists($fullpath)) {  
+        //file_check_directory() creates a form error automatically 
+        file_check_directory($fullpath, 0, 'image_title_upload'); 
+      }  
+      
+    }  
+    
+    // check if not writable .. 
+    if( !is_writable($fullpath) ) { 
+      $mod = fileperms($fullpath) & 0777;  
+      // attempt to update permission 
+      @chmod($fullpath, $mod);  
+      if( !is_writable($fullpath) ) { 
+        form_set_error('image_title_upload', t("Directory is not writable")); 
+      } 
+    } 
+   
+} 
 
 /**
  * submit function sets variables for this module:

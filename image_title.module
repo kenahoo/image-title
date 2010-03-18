@@ -67,12 +67,35 @@ function image_title_menu_router_form() {
 /**
  * Validation for title image upload form on pages that are not nodes
  */
-function image_title_menu_router_form_validate($form, &$form_state) {
+function image_title_menu_router_form_validate($form, &$form_state) { 
+  
   if (!empty($_FILES['files']['name']['image_title_upload'])) {
-  $fullpath = file_directory_path() . '/' . variable_get('image_title_directory', 'img-title');
-  //file_check_directory() creates a form error automatically
-  file_check_directory($fullpath, 0, 'image_title_upload');
-  }
+    $fullpath = file_directory_path() . '/' . variable_get('image_title_directory', 'img-title');
+        
+    if (!file_exists($fullpath)) {  
+      if (@mkdir($fullpath, intval("00", 8))) {
+        $mod = fileperms($fullpath) & 0777;  
+        // update permission 
+        @chmod($fullpath, $mod);      
+      } 
+      if (!file_exists($fullpath)) {  
+        //file_check_directory() creates a form error automatically 
+        file_check_directory($fullpath, 0, 'image_title_upload'); 
+      } 
+      
+    }  
+    
+    // check if not writable .. 
+    if( file_exists($fullpath) && !is_writable($fullpath) ) { 
+      $mod = fileperms($fullpath) & 0777;  
+      // attempt to update permission 
+      @chmod($fullpath, $mod);  
+      if( !is_writable($fullpath) ) { 
+        form_set_error('image_title_upload', t("Directory is not writable")); 
+      } 
+    } 
+    
+  } 
 }
 
 /**
@@ -128,7 +151,7 @@ function image_title_form_alter(&$form, $form_state, $form_id) {
     $form['workflow']['image_title'] = array(
       '#type' => 'radios',
       '#title' => t('Default image title'),
-      '#default_value' => variable_get('image_title_'. $form['#node_type']->type, 0),
+      '#default_value' => variable_get('image_title_'. $form['#node_type']->type, 1),
       '#options' => array(t('Disabled'), t('Enabled')),
       '#description' => t('Enable this to have image title for this content type.'),
     );
@@ -147,7 +170,7 @@ function image_title_form_alter(&$form, $form_state, $form_id) {
   }
   
   //check user is permitted to create image titles
-  if (user_access('create image titles') && (variable_get('image_title_'. $type, 0) == 1)) {
+  if (user_access('create image titles') && (variable_get('image_title_'. $type, 1) == 1)) {
     
     //load an existing picture
     $node =  $form['#node'];
@@ -157,7 +180,7 @@ function image_title_form_alter(&$form, $form_state, $form_id) {
     if ($picture) {
       $collapsed = FALSE;
     }
-        
+    
     // check node type and match settings
     if ($form_id == $type . '_node_form' ) {
       $form['image_title'] = array(
@@ -181,10 +204,10 @@ function image_title_form_alter(&$form, $form_state, $form_id) {
             '#default_value' => 0,
             '#title' => t('Delete title image.'),
           ); 
-      }
+      } 
       // status for ability to hide for specific content 
       $form['image_title']['current_title_image_status'] = array('#type' => 'checkbox', 
-                                                     '#default_value' => $node->image_title_status,  
+                                                     '#default_value' => isset($node->image_title_status) ? $node->image_title_status : 1 ,  
                                                      '#title' => t('Show this image in place of title'), 
                                                      '#description' => t('Check this box to override title with image uploaded.'),
                                                      ); 
@@ -224,16 +247,37 @@ function image_title_theme() {
  * (save, update, delete, etc.) 
  */
 function image_title_nodeapi(&$node, $op, $teaser, $page) {
-  if ( !user_access('create image titles') || (variable_get('image_title_'. $node->type, 0) == 0) ) {    
+  if ( !user_access('create image titles') || (variable_get('image_title_'. $node->type, 1) == 0) ) {    
     return; // do nothing ... 
   }
   switch ($op) {
     case 'validate':
       if (!empty($_FILES['files']['name']['image_title_upload'])) {
-        $path = file_directory_path();
+        $path = file_directory_path(); 
         $fullpath = $path . '/' . variable_get('image_title_directory', 'img-title');  
-        if (!file_check_directory($fullpath)) {
-          form_set_error('image_title_upload', t('Failed to upload the image title; the %directory directory doesn\'t exist or is not writable.', array('%directory' => $fullpath)));
+        if (!file_check_directory($fullpath)) {  
+          if (!file_exists($fullpath)) {  
+            if (@mkdir($fullpath, intval("00", 8))) {
+              $mod = fileperms($fullpath) & 0777;  
+              // update permission 
+              @chmod($fullpath, $mod);      
+            } 
+            if (!file_exists($fullpath)) {  
+              //file_check_directory() creates a form error automatically 
+              file_check_directory($fullpath, 0, 'image_title_upload'); 
+            }              
+          }  
+          
+          // check if not writable .. 
+          if( !is_writable($fullpath) ) { 
+            $mod = fileperms($fullpath) & 0777;  
+            // attempt to update permission 
+            @chmod($fullpath, $mod);  
+            if( !is_writable($fullpath) ) {  
+              form_set_error('image_title_upload', t('Failed to upload the image title; the %directory directory doesn\'t exist or is not writable.', array('%directory' => $fullpath)));  
+            } 
+          } 
+           
         }
       }
       break;
@@ -294,7 +338,10 @@ function image_title_nodeapi(&$node, $op, $teaser, $page) {
       $image_title = db_fetch_array(db_query('SELECT image, status FROM {image_title_node} WHERE nid = %d', $node->nid));
       return array('image_title' => $image_title['image'], 'image_title_status' => $image_title['status'] ); 
     break;
-    
+    case 'view':
+      drupal_add_css( drupal_get_path('module', 'image_title') .'/image_title.css');  
+      
+      break;
     case 'delete':
       //clean up any orphan title images
       $image_title = db_fetch_array(db_query('SELECT image  FROM {image_title_node} WHERE nid = %d', $node->nid));
@@ -314,6 +361,7 @@ function image_title_nodeapi(&$node, $op, $teaser, $page) {
  * offers the form for title image upload as a variable for theming
  */
 function image_title_preprocess_page(&$variables) { 
+  
   if (arg(0) === 'node' && is_numeric(arg(1))) {
     $thisnode = node_load($variables['node']->nid);
     if ($thisnode->image_title && $thisnode->image_title_status ) { 

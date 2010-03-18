@@ -12,6 +12,11 @@ function image_title_install() {
  * Implementation of hook_uninstall().
  */
 function image_title_uninstall() { 
+  variable_del('image_title_directory'); 
+  $types = node_get_types(); 
+  foreach ($types as $type => $object) {  
+    variable_del('image_title_'.$type);  
+  } 
   drupal_uninstall_schema('image_title'); 
 }
 
@@ -34,6 +39,12 @@ function image_title_schema() {
         'length' => 255,
         'default' => '',
       ),
+      'status' => array(
+        'description' => t('Status to switch between Image title and text title.'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
     ),
     'primary key' => array('nid', 'image'),
   );
@@ -51,6 +62,12 @@ function image_title_schema() {
         'type' => 'varchar',
         'length' => 255,
         'default' => '',
+      ),
+      'status' => array(
+        'description' => t('Status to switch between Image title and text title.'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
       ),
     ),
     'primary key' => array('path'),
