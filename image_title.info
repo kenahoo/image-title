@@ -1,4 +1,3 @@
-; $Id$
 name = Image Title
 description = Allows to upload nice image to replace text version of node title
 package = Other
