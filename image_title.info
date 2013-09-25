@@ -2,4 +2,6 @@ name = Image Title
 description = Allows you to upload images to replace text versions of page titles
 package = Other
 version = VERSION
-core = 6.x
+core = 7.x
+
+configure = admin/config/media/image-title
